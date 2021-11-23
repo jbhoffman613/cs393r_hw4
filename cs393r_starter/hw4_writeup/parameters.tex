@@ -1,0 +1,14 @@
+\section{Parameters}
+
+Our autonomous navigation implementation uses the following tunable parameters. We only include newly-added parameters here, not parameters from the prior projects that were integrated into this assignment. 
+
+\begin{enumerate}
+    \item \textbf{GRAN}: the granularity of the grid used by A* in meters. We set it to 0.25 meters.
+    \item \textbf{CARROT\_RADIUS}: the threshold used to determine when to advance the intermediate goal to the next point in the global plan. When the car gets within {\tt CARROT\_RADIUS} meters of the current intermdiate goal, we change its goal to the next point in the plan. We set this value to 2 meters.
+    \item \textbf{REWARD\_MIN\_FREE\_PATH}: proposed paths with a free path length below this value are given an extremely low reward value and thus are not considered by the local planner. This ensures that the local planner will not choose paths that drive the car too close to an obstacle, even if they have a very short carrot distance. We set it to 0.3 meters.
+    \item \textbf{FLRR\_DURATION}: The duration of the J-Turn segments. The value is currently 2, so the segment length is $0.1$ seconds. 
+    \item \textbf{J\_TURN\_VELO}: 0.5 m/s - the constant velocity at which to execute a J-turn. 
+    \item \textbf{J\_TURN\_CURV}: 2 - the constant curvature value at which to execute a J-turn. 
+    \item \textbf{Car Velocity}: We were able to run all of assignment 4 at $2 m\/s$.
+    \item See sec. \ref{rewardparam} to see the the new reward function formulation, and the associated parameters.
+\end{enumerate}

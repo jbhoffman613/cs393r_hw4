@@ -1,0 +1,24 @@
+\section{Local planner}
+
+Our original implementation for the obstacle avoidance project used a reward function based on the free path length, curvature, and clearance from nearest obstacle of each path candidate. To add the local planner, we added a term, which we call the path's carrot distance $d_{carrot}$, to this reward function to prioritize paths that keep the car close to the global plan.
+
+At all times during autonomous navigation, the car is trying to drive towards the next point $p_i = (x_i^{map}, y_i^{map})$ in the global plan. For some path candidate, the carrot distance represents the minimum distance between a point on the path candiate's trajectory and $p_i$. For a given path candidate, we calculate the carrot distance as follows. First, we transform the coordinates of $p_i$ from the map frame into the car's local frame using an Affine2f transformation matrix. We wrote a function called {\tt DeltaToTransform()} for the previous assignment that takes $\Delta x$, $\Delta y$, and $\Delta \theta$ between two points in the same frame and outputs an Affine2f transformation matrix from the first point's frame into the second point's. We use this function to obtain the matrix for this transformation and apply it to obtain $(x_i^{local}, y_i^{local})$.
+
+If the curvature of the proposed path is 0 (i.e. the path is straight foward), then the minimum distance between the trajectory of the path and $p_i$ is just $y_i^{local}$. This works because the proposed path runs along the $x$-axis of the car's local frame. Otherwise, we calculate the carrot distance as follows. We obtain the turning radius $r$ of the path candidate ($1 / $ the curvature of the proposed path) and from that obtain the center of the turn in the car's local frame $(x_{turn}^{local}, y_{turn}^{local})$ as either $(0, r)$ (for left turns) or $(0, -r)$ (for right turns). Then, we calculate the distance $d$ from the center of the turn to the next path point as $d = \sqrt{(x_{turn}^{local} - x_i^{local})^2 + (y_{turn}^{local} - y_i^{local})^2}$. Finally, we obtain the carrot distance (i.e. only the distance between the trajectory of the proposed path and $p_i$) with $d^{carrot} = d - r$.
+
+After calculating $d_{carrot}$ for each proposed path, we apply a reward function to obtain a score for each one. The proposed path with the highest reward is chosen. The reward function still ensures that the car avoids obstacles while also driving towards $p_i$. We pick the curve with the highest reward value. 
+
+Below are the parameters used in the reward function:
+\begin{enumerate}
+\label{rewardparam}
+	\item The free path value is $min(free\_path\_length~*~3.5,~20.0)$
+	\item We prefer the car to drive straighter and limit sharp curves, so we multiply the proposed curve in the following way: $-1.0~*~abs(curve)$.
+	\item We multiply the clearance of a proposed curve by $5.0$	
+	\item We calculate the "carrot value" by finding the closest point on a given curve and the carrot location. We incorporate the value into the reward function in the following way: $1/abs(carrot_distance)$. 
+\end{enumerate}
+
+Note, if we do not have enough clearance, we drop the proposed curve by assigning it a reward value of $-10000003$, and when we are within $0.7m$ of the goal, we multiply the carrot distance by $10.0$.  
+
+Once the car gets within {\tt CARROT\_RADIUS} meters of $p_i$, where {\tt CARROT\_RADIUS} is a tunable parameter, we increment $i$ and begin aiming at $p_{i+1}$. $i$ is initialized to be the third point on the global plan, and is kept several nodes ahead of the actual location of the car, which gives the car some freedom in terms of how it approaches its current intermediate goal. 
+
+When the car's Euclidean distance to the navigation goal falls below a tunable threshold, we use time-optimal control to ensure the car stops close to the goal point.

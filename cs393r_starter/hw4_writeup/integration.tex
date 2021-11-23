@@ -1,0 +1,6 @@
+\section{Project integration}
+\label{integ}
+
+After finishing our A* implementation, we integrated our obstacle avoidance implementation by extending it as a local planner that directs the car along the path chosen by the global planner. This required (1) adding a call to the global planner to construct a path at initialization and to replan periodically after that; (2) adding a function to compute carrot distance for a given path proposal; (3) modifying the reward function to account for the carrot distance; (4) handling time optimal control as the car approaches the final goal in a special case; and (5) tuning all of the parameters in our navigation stack. 
+
+We used a different group's particle filter. We used bumper car's particle filter from \url{https://github.com/zacswolf/cs393r_starter}. We did not make any modifications to it. We decided to not use our own because we had points taken off for not tuning our particle filter well enough, so instead of spending time tuning, we went with one that already seemed to be well-tuned. 

@@ -1,0 +1,40 @@
+\section{Global planner}
+
+\subsection{8-Connected Grid}
+We abstracted the search space by using an 8-connected grid. We computed the grid dynamically as we needed new neighbors. We would only add grid spaces that did not intersect with a wall based on the map that was passed in on initialization. We set a parameter to define the area size of each grid. For example, if the value was $0.25$, then each grid space was of size $0.25~x~0.25$. 
+
+\subsection{A* implementation and Algorithmic Details.}
+Over the 8-connected grid, we searched for a solution using A*. We used the provided priority queue, and we wrote our own cost function and heuristic function. As described in sec. \ref{replan}, our implementation was fast enough to online replanning on some fixed time interval. Furthermore, we believe that our heuristic function is admissible, so our search process always returned an optimal path. 
+
+\subsubsection{Algorithm}
+Below is the pseudo-code of our implementation: 
+\begin{algorithmic}[1]
+\State frontier$~=~$priority\_queue()
+\State frontier.push(start\_node, 0)
+\State parents[start\_node] = Null
+\State cost[start\_node] = 0
+\While{frontier.not\_empty()}
+	\State current\_node = frontier.pop()
+	\If{current\_node is goal\_state}
+		\State return parents.back\_track(current\_node)
+	\EndIf
+	\For{next in get\_neighbors(current\_node)}
+		\State new\_cost = cost[current\_node] + EdgeCost(current\_node, next)
+		\If{next not in cost or new\_cost $<$ cost[next]}
+			\State cost[next] = new\_cost
+			\State frontier.push(next, new\_cost + Heuristic(next))
+			\State parent[next] = current\_node
+		\EndIf
+	\EndFor
+\EndWhile
+\end{algorithmic}
+
+\subsubsection{Heuristic Function}
+For the heuristic function, we used the euclidean distance (as the crow flies) between the proposed point and the goal point. We then translated into the units of our cost function to make it admissible. 
+
+\subsubsection{Cost Function}
+The cost function is the distance travelled to get to that node in the units of our grid. This meant that traversing between adjacent spaces had a cost of 1, and traveling along a diagonal in any direction had a cost of $\sqrt{2}$
+
+\subsection{Replanning}
+\label{replan}
+Replanning is handled in the following way. We first find the difference in the angle between the heading of the car and the heading of the vector made from the point we are currently following and the point after that on the global plan. When the difference is between 30 and 90 degrees, we rerun A* treating the car's current location and angle of the car as the starting position and using the same goal location. When the angle exceeds 100 degrees, we execute a J-turn. We found that this replanning approach worked well enough to account for deviations from the goal path due to obstacle avoidance.

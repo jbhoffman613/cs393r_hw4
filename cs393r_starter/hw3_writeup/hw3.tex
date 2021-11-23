@@ -1,0 +1,61 @@
+
+
+\title{Homework 3 - SLAM}
+\author{
+        Arnav Iyer, Hayley LeBlanc, and Josh Hoffman \\
+        			The Vroom Vroomers \\
+                CS 393 - Autonomous Robots\\
+      }
+\date{\today}
+
+\documentclass[12pt]{article}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{todonotes}
+
+\begin{document}
+\maketitle
+
+\abstract{We threw code at a wall, prayed, spent many hours, and ended up with this.}
+
+\section{Parameters}
+Below are the tunable parameters used in our implementation:
+
+\begin{enumerate}
+	\item LOOKUP\_METERS: The side length in meters of our rasterized look up table - 20.0
+	\item LOOKUP\_PIXEL\_DIM: The side length in meters of each pixel in our rasterized look up table - 0.02
+	\item LOOKUP\_STDDEV: The standard deviation used in evaluating the look up table in centimeters - 2.0
+	\item LOOKUP\_AREA: An optimization where for a given point in our look up table, we only computed the surrounding pixels. This is the side length of that area in the number of indices (an int) - 10
+	\item LIDAR\_OFFSET: The distance between the LIDAR scanner and the base link of the car in meters - 0.205
+	\item CUBE\_SIDE\_LENGTH: The side length of the perturbation cube as an int - 11
+	\item PERTURB\_SIZE: The amount to perturbation along the x and y axis in meters for each pixel in the cube - 0.02	
+	\item PERTURB\_RADIAN: The amount to perturbation for theta in radians for each pixel in the cube - 0.0872665
+	\item K1: As in the particle filter, this modifies the distance between odometer points when calculating the standard deviation for translation in evaluating the motion model - 0.05
+	\item K2: As in the particle filter, this modifies the change in theta based in odometer for the standard deviation for translation in evaluating the motion model - 0.05
+	\item K3: As in the particle filter, this modifies the distance between odometer points when calculating the standard deviation for the angle in evaluating the motion model - 0.5
+	\item K4: As in the particle filter, this modifies the change in theta based in odometer for the standard deviation for the angle in evaluating the motion model - 1.0
+\end{enumerate}
+
+\section{Challenges}
+We faced so many challenges in this assignment. First, we spent sometime trying to figure out the math for this assignment, and that did take away some time as it was required in the original homework handout. We also spent quite a bit of time trying to figure out how to properly set up the lookup table given that it is actually in graphics coordinates, and how to debug it. We solved this issue via a few different strategies. We did so by rereading the paper and using what people posted on piazza. More importantly, as described in section \ref{cool}, we actually built our own visualization tool in python to display the look up table before the visualization tool was made available. 
+
+We spent a tremendous amount of time trying to implement GetPose and the issues around it. Even though the math is simple, it did not look right the first time we did it. We then tried many variations including various matrix multiplication operations and trying variations of the transform formulas as laid out on Slide 26/27 of lecture 6. What ultimately solved it was doing the transform over difference in the odometry when we first read in the data when collecting a pose. We did not realize that this little step was so crucial and was quite literally life or death for this project. This singular bug probably took us over 8 hours to fix. 
+
+Generally, we posted many of these issues to Piazza, and we are extremely grateful to our peers, TA, and professor who took the time to answer our questions and helped us out. We could not have done it without you. \#ItTakesAVillage 
+
+However, while we have a working solution that works well in simulation, our offline solution is not perfect. Given that it appears to work in simulation, we do attribute this to more be an issue of tuning than a fundamental algorithmic issue. This is obviously not solved, and we due attribute it to just running out of town. We also found the time constraints of this assignment to be very tough. We spent a ton of time on the social robotics assignment, and we are proud of what we wrote, but it really cut into the amount of time available to implement and debug this assignment. We do ultimately feel that this was way more difficult than the particle filter. 
+
+\section{Cool results}
+\label{cool}
+While small, before Joydeep published his own debugging tool, we came up with a way to visualize the took up table. We first would write the rasterized look up table to a CSV where each value in the CSV was our likelihood estimate. We then read in the file into a python function we wrote that would render the image where each pixel that was near zero would be black, and the higher the likelihood, the closer the value would be to being white. This file is called \texttt{display\_csv.py}. Some of our CSV files are still in the final repo that we submitted.  
+
+\section{Contributions}
+We all spent a tremendous amount of time on this assignment, and in our view, everyone contributed equally. In the beginning, we all met in person and spent many hours together. Towards the end, comrade Arnav fell ill. Even though he has been sick towards the end, he has been debugging at home, Hayley and Josh have spent many hours in person pair-programming to get it up and running. Hayley collected the bag file our submission. Josh wrote this document and created the video.  
+
+\section{Github Link}
+LINK
+
+\section{Video}
+\url{https://drive.google.com/file/d/1NtoiyGWNDkPKJyYqil0izTcit06aWHsX/view?usp=sharing}
+
+\end{document}

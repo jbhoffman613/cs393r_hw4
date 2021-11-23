@@ -1,0 +1,20 @@
+\section{Challenges}
+
+Our biggest challenge was that our car broke on the Sunday before the deadline. We still had all of the tuning work to do as well as implementing the robust gaussian. We had to spend time trying to figure out if there was a way for us to fix the car on our own while simultaneously completing the assignment. We ended up using the provided rosbag files to tune our particle filter and test our code.
+
+Another big challenge with this project was keeping all of the math and particle filter improvements in mind as we wrote our code. We had to spend several meetings working through the math for the predict and update steps before we started writing any code at all, which delayed us in getting to our implementation. The discussion of particle filter problems and their solutions in class helped (slide deck 8), but it was still hard to keep track of all of the discussed problems and their associated solutions as we wrote our particle filter. Several times, we found ourselves struggling with strange bugs for hours, only to realize that the solution was discussed briefly in class and was documented on a slide that we had forgotten to check. This error on our part significantly slowed us down. 
+
+\section{Interesting Results}
+Our minimum working implementation of the particle filter did not use a truncated gaussian in the observation likelihood model, and it used the maximum range of the LIDAR as given by the manufacturer. When we implemented a truncated gaussian and limited the range of the LIDAR, the accuracy of our particle filter increased much more. This makes us wonder about the effect that other improvements on the naive particle filter have on accuracy like using KLD-resampling or corrective gradient refinement. 
+
+\section{Contributions}
+
+All three group members contributed equally to this assignment. We pair-programmed or trio-programmed most of the code, and we tuned and debugged the particle filter together during our group meetings. Josh and Hayley spent a bit more time on the writeup and implementing resampling, whereas Arnav spent some more time tuning and making our observation likelihood function more robust.
+
+\section{Github Repo Link}
+
+\url{https://github.com/jbhoffman613/cs393r_hw2}
+
+\section{Video Recording}
+
+\url{https://drive.google.com/file/d/12NZmfZwuNiVm3Mfa-ACbv-bIgumRVTiK/view?usp=sharing}

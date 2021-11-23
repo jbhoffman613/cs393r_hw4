@@ -1,0 +1,120 @@
+\section{Math}
+
+\subsection{Predict step}
+
+In our predict step, for each particle $p_i$, we first compute what we call the noise-free next state of the particle. This state consists of location $T_2^\mathrm{map} = \begin{bmatrix} x_2^\mathrm{map} \\ y_2^\mathrm{map} \end{bmatrix}$ with angle $\theta_2^\mathrm{map}$ (both in the map frame), and it gives the new state of $p_i$ if odometry was perfect and noise-free.
+
+The first step in calculating $T_2^\mathrm{map}$ and $\theta_2^\mathrm{map}$ is to compute the change in translation and change in angle in the base link. We calculate the change in translation with
+$$
+    \Delta T^\mathrm{base\_link} =R(-\theta_1^\mathrm{odom})(T_2^\mathrm{odom}-T_1^\mathrm{odom})
+$$
+using 
+$
+    T^\mathrm{odom} = \begin{bmatrix}
+            x^\mathrm{odom} \\
+            y^\mathrm{odom}
+        \end{bmatrix}
+$ and 
+$
+        R(\theta) = \begin{bmatrix}
+            \cos{\theta} & -\sin{\theta} \\
+            \sin{\theta} & \cos{\theta}
+        \end{bmatrix}
+$
+where $x^{odom}$ and $y^{odom}$ are $x$ and $y$ positions in the odometry frame given by an odometry reading. 
+
+In order to calculate the change in angle $\Delta \theta^\mathrm{base\_link}$, we need to use the difference $\Delta \theta^\mathrm{odom} = \theta_2^\mathrm{odom} - \theta_1^\mathrm{odom}$. However, there are a couple of cases where computing this difference directly does not work in practice. We discovered that odometry readings represent angles between $\pi$ and $2\pi$ radians with values between $-\pi$ and $0$ radians. This means that when the car's angle passes $\pi$ radians in the odometry frame, there will be a time step where the previous odometry angle is close to $\pi$ and the new one is close to $-\pi$, or vice versa. So, we determine $\Delta \theta^\mathrm{base\_link}$ as follows:
+
+\begin{align*}
+    \Delta \theta^\mathrm{base\_link} = \begin{cases}
+        \mathrm{if} ~ \Delta \theta^\mathrm{odom} < -\pi & \Delta \theta^\mathrm{odom} + 2\pi \\
+        \mathrm{if} ~ \Delta \theta^\mathrm{odom} > \pi & 2\pi - \Delta \theta^\mathrm{odom} \\ 
+        \mathrm{else} & \Delta \theta^\mathrm{odom}
+    \end{cases}
+\end{align*}
+
+% from code:
+% if (std::abs(diff) > M_PI) {
+%     if (diff < 0) {
+%       return diff + (M_PI * 2);
+%     } else {
+%       assert(diff < (2*M_PI));
+%       return (M_PI * 2) - diff;
+%     }
+%   }
+
+Using $\Delta T^\mathrm{base\_link}$ and $\Delta \theta^\mathrm{base\_link}$, we calculate our $T_2^\mathrm{map}$ and $\theta_2^\mathrm{map}$ as follows
+\begin{align*}
+    T_2^\mathrm{map} &= T_1^\mathrm{map} + R(\theta_1^\mathrm{map})(\Delta T^\mathrm{base\_link}) \\
+    \theta_2^\mathrm{map} &= \theta_1^\mathrm{map} + \Delta \theta^\mathrm{base\_link}
+\end{align*}
+where $T_1^\mathrm{map}$ and $\theta_1^\mathrm{map}$ give the state of the car at the previous time stamp.
+
+We now use the noise-free state given by $T_2^\mathrm{map}$ and $\theta_2^\mathrm{map}$ in our motion model to sample $x_{new}$, $y_{new}$, and $\theta_{new}$ values for $p_i$. The motion model consists of three Gaussians, one each for $x_{new}$, $y_{new}$, and $\theta_{new}$. Let $m = \sqrt{(x_2^\mathrm{odom} - x_1^\mathrm{odom}) + (y_2^\mathrm{odom} - y_1^\mathrm{odom})}$ (i.e. the magnitude of the translation between the previous and current timesteps). These Gaussians are defined as follows:
+\begin{align*}
+    x_{new} \sim N(x_2^\mathrm{map}, mk_1 + k_2\Delta \theta^\mathrm{base\_link}) \\
+    y_{new} \sim N(y_2^\mathrm{map}, mk_1 + k_2\Delta \theta^\mathrm{base\_link}) \\
+    \theta_{new} \sim N(\theta_2^\mathrm{map}, mk_3 + k_2\Delta \theta^\mathrm{base\_link})
+\end{align*}
+where $k_1, k_2, k_3, k_4$ are tunable constants.
+
+\subsection{Update}
+
+In our update step, for each particle $p_i$, we first call the function \texttt{GetPredictedPointCloud()} to construct the predicted point cloud for that particle. This function constructs a set of 50 line segments representing rays from $p_i$'s predicted LIDAR sensor. We use the provided methods to check whether each of these predicted lines intersects with each line on the map, and save the coordinates of the closest intersection to the particle for each LIDAR ray. This set of points forms the predicted point cloud for $p_i$. If a LIDAR ray does not intersect with any point within 10 meters of the particle, we drop it and do not consider it in the update step.
+
+%For each particle, we find the distance of each point in the predicted point cloud, and compare the distance of the predicted ray with the distance of the actual ray (from the real lidar scan) which has the most similar angle. 
+
+For each particle, we find the distance of that particle to each point in its predicted point cloud, and the distance of that particle to each point in the real point cloud. We compare the distances between the predicted and real points that have the most similar angle.
+We then calculate the new weight using a maximum likelihood-esque formulation. From the slides, we start with: $p(s_t | x_t) \propto \prod_{i=1}^n exp[-0.5 * \frac{(s_t^i - \hat{s}_t^i)^2}{\sigma_s^2}]^\gamma$ where gamma makes our observation likelihood function more robust by reducing the confidence of the model. 
+
+We then apply a $log$ function to it in order to get the log likelihood. We do this to reduce floating point errors when taking the product. The above then becomes: $log~p(s_t | x_t) \propto -0.5 * \gamma * \sum_{i=1}^n \frac{(s_t^i - \hat{s}_t^i)^2}{\sigma_s^2}$. To make our particle filter more robust to LIDAR errors, unexpected obstacles, and discrepancies between the map and the real world, our final observation likelihood model is:
+\begin{align*}
+    log~p(s_t | x_t) \propto -0.5 * \gamma * \sum_{i=1}^n \begin{cases}
+        0 & \mathrm{if} ~ s_t^i < s_{min} \lor s_t^i > s_{max}  \\
+        [\frac{d_{short}^2}{\sigma_s^2}] & \mathrm{if} ~ s_t^i < \hat{s}_t^i - d_{short} \\
+        [\frac{d_{long}^2}{\sigma_s^2}] & \mathrm{if} ~ s_t^i > \hat{s}_t^i +d_{long} \\
+        [\frac{(s_t^i - \hat{s}_t^i)^2}{\sigma_s^2}]& else 
+    \end{cases}
+\end{align*}
+Now, these probabilities will eventually become our weights s.t. $w_i = p(s_t | x_t)_{particle_i}$. In order to do so, we normalize the values by dividing by the maximum weight and transform it from log-likelihoods back into probabilities by exponentiating the new value. Thus, our probabilities will be will become our new weight values in the following way: $w_i' = exp[log~p(s_t | x_t)_{particle_i} - w_{max}]$ where $w_{max}$ is the maximum value of $log~p(s_t | x_t)_{particle_i}$ over all of the particles. We will use these weights in section \ref{resample} in order to resample as we move in the world.
+
+\subsection{Resample}
+\label{resample}
+
+% In the resample step, we first normalize the weights obtained in the update step and construct a weights list $W = w_0, w_1, ..., w_{n-1}$ where $w_0 = p_0.weight$ and $w_i = p_i.weight + w_{i-1}$. The order of the weights in $W$ is determined by the order of the unsorted list of particles. Then we randomly select a seed value $s \in [0, 1/n)$ to begin sampling with. Then, we resample the $i$th particle 
+
+In the resample step, we first normalize the weights obtained in the update step to ensure all weights are between 0 and 1 and construct a weights list $W = w_0, w_1, ..., w_{n-1}$ where $w_0 = p_0^{weight}$ and $w_i = p_i^{weight} + w_{i-1}$. The order of the weights in $W$ is determined by the order of the unsorted list of particles. Then we randomly select a seed value $s \in [0, 1/n]$ from a uniform distribution. Then, we resample $n$ particles using the following approach. For the $i$th particle, select a weight using $s + (i * \frac1n)$. We resample the particle (with replacement) at index $k$ where $w_{k - 1} < (s + (i * \frac1n)) < w_{k}$. This approach avoids loss of diversity.
+
+\subsection{Location prediction}
+To predict the car's location in the \texttt{GetLocation()} function, we take a weighted average over our particles. For the $x, y$ location of the car, we use the following formula 
+$$
+        \begin{bmatrix} x^{aver} \\ y^{aver} \end{bmatrix} = 
+        \begin{bmatrix}
+             \frac{\sum_{j=1}^{n} x_j^{weight} * x_j}{\sum_{i = 1}^{n} x_i^{weight}} \\
+             \frac{\sum_{j=1}^{n} y_j^{weight} * y_j}{\sum_{i = 1}^{n} y_i^{weight}}
+        \end{bmatrix}
+$$ yielding a weighted average based on the weights from the update step. To find the average angle, use the following formula to find a weighted average angle: 
+$$
+    \theta^{aver} = atan2(\frac{\sum_{j=1}^n \theta_j^{weight} * sin(\theta_j)}{\sum_{i = 1}^{n} \theta_i^{weight}}, \frac{\sum_{j=1}^n \theta_j^{weight} * cos(\theta_j)}{\sum_{i = 1}^{n} \theta_i^{weight}}).
+$$
+
+\subsection{Tuned values}
+
+We tuned the following parameters:
+\begin{itemize}
+    \item The number of particles in the particle filter. We set this value to 50.
+    \item The number of LIDAR rays used to predict the point cloud for each particle. We set this value to 50.
+    \item $k_1$: tunes translational error from translation in the motion model. We set it to 0.3.
+    \item $k_2$: tunes translational error from rotation in the motion model. We set it to 0.5.
+    \item $k_3$: tunes rotational error from translation in the motion model. We set it to 1.5.
+    \item $k_4$: tunes rotational error from rotation in the motion model. We set it to 1.5.
+    \item \texttt{INIT\_STDDEV\_R}: standard deviation of the Gaussian used to initialize particle angles. We set it to 0.15 radians.
+    \item \texttt{INIT\_STDDEV\_T}: standard deviation of the Gaussian used to initialize a particle's $x,y$ location in the map frame. We set it to 1 meter.
+    \item \texttt{LIDAR\_RANGE\_CAP}: maximum length of LIDAR rays; we throw out any rays that do not have an intersection point within this distance to the car. We set it to 10 meters. 
+    \item $\gamma$: Deals with overconfidence in the observation likelihood model. We set it to 0.5.
+    \item \texttt{SENSOR\_STDDEV}: the standard deviation of the LIDAR sensor - meant to reflect the noise/error of our sensor. We set it to 0.15 meters.
+    \item $d_{short}$: When the simulated intersection point is closer to the robot than the LIDAR cloud point for a certain theta, $d_{short}$ represents the distance after which differences between simulated cloud and LIDAR cloud points contribute equally to the log likelihood. It is used to mitigate the effect of non-permanent objects in a space on the likelihood. We set it to 0.35 meters. 
+    \item $d_{long}$: When the simulated intersection point is farther away from the robot than the LIDAR cloud point for a certain theta, $d_{long}$ represents the distance after which differences between simulated cloud and LIDAR cloud points contribute equally to the log likelihood. It is used to mitigate the effect of reflective and transparent surfaces. We set it to 0.05 meters.
+\end{itemize}
+
+We tuned $k_1, k_2, k_3, k_4, d_{short}, d_{long}, \gamma$, and \texttt{SENSOR\_STDDEV} by running our particle filter in simulation and on rosbag files. We decided which values to change by looking at the visual difference between the predicted and real point clouds and by what the car appeared to be doing at the time of a mismatch. We tuned individual values of $k_i$ this way based on the specific motions of the car at the times where the particle clouds appeared to differ significantly. Once the $k_i$ value tuning did not seem to have a significant impact, we tuned the other parameters to make small adjustments. \todo{Arnav, change what is in bold.} \textbf{We did not actually tune \texttt{INIT\_STDDEV\_R} or \texttt{INIT\_STDDEV\_T}, although they are tunable; the initial values we chose appeared to be reasonable, and our particle filter causes the values to quickly converge after initialization.} We also did not tune the number of particles or LIDAR rays; the suggested values worked well for us.
